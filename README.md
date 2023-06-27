@@ -2,7 +2,7 @@
 
 This repository provides sample code for how to load Pendo Data Sync data from Google Cloud Storage (GCS) into Google BigQuery (BQ). For detailed instructions on this process, please see the (Data Sync Export Handling)[https://support.pendo.io/hc/en-us/articles/14617105854875-Data-Sync-Export-Handling] article in the Pendo Help Center.
 
-All code in this repository is free to use, and as such, there is NO WARRANTY, SLA or SUPPORT for this code. This code is meant to be a starting point for your team to help you get to value with Pendo Data Sync more quickly. Please do not reach out to Pendo Support for help with these code, as Data Sync ETL is outside of the remit of their team and responsibilities.
+This library of custom code snippets has been created by Pendo Professional Services, with the intent of enhancing the capabilities of Pendo products. Any and all snippets in this library are free and provided at no additional cost, and as such, are provided "AS IS. For the avoidance of doubt, the library does not include any indemnification, support, or warranties of any kind, whether express or implied. For the avoidance of doubt, these snippets are outside of the remit of the Pendo Support team so please do not reach out to them for assistance with the library of code. Please do not reach out to Pendo Support for help with these snippets, as custom code is outside of the remit of their team and responsibilities.
 
 ### Getting Started
 
@@ -46,14 +46,20 @@ Once your development environment is configured, you have successfully setup a D
 python load_async.py <GCP_SOURCE_BUCKET_NAME> <GCP_SOURCE_PATH_TO_APPLICATION> <GCP_DESTINATION_PROJECT_NAME> <GCP_DESTINATION_DATASET_NAME>
 ```
 
-The second version performs all GCP load and query commands asynchronously in a thread queue. This allows multiple jobs to be running in parallel for better performance. We would recommend instrumenting a similar approach for your production ETL process:
+The second version performs all GCP load and query commands asynchronously in separate thread queues. This allows multiple jobs to be running in parallel for better performance. We recommend instrumenting a similar approach for your production ETL process:
 
 ```
 python load_sync.py <GCP_SOURCE_BUCKET_NAME> <GCP_SOURCE_PATH_TO_APPLICATION> <GCP_DESTINATION_PROJECT_NAME> <GCP_DESTINATION_DATASET_NAME>
 ```
 
+Additionally, there is a script to manually create/update a counter.json file used to track the current export to load:
+
+```
+python set_counter.py <GCP_SOURCE_BUCKET_NAME> <GCP_SOURCE_PATH_TO_APPLICATION> <COUNTER_VALUE>
+```
+
 ### Notes
 
-- For best performance, we recommend partitioning tables based on periodId. This allows for better performance for targeted re-writes in the case that data changes for a previously exported period. This sample code follow that guidance and shows one approach setting up table partitions.
-- This sample code uses a counter that corresponds to the `counter` field in the `exportmanifest.json` to track which export needs to be loaded next. The current value for this counter is stored in a JSON file in your cloud storage. By default, the cleanup step that iterates this counter is commented out for testing.
+- For best performance, we recommend partitioning tables based on periodId. This allows for better performance for targeted re-writes in the case that data changes for a previously exported period. This sample code follows that guidance and shows one approach setting up table partitions.
+- This code uses a counter that corresponds to the `counter` field in the `exportmanifest.json` to track which export needs to be loaded next. The current value for this counter is stored in a JSON file in your cloud storage. By default, the cleanup step that iterates this counter is commented out for testing.
 - This code does not remove exports after loading the Avro files into the appropriate BQ tables. You may want to include a step in cleanup to remove these exports to keep cloud storage costs to a minimum.
