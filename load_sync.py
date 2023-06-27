@@ -1,6 +1,5 @@
-# All code in this repository is free to use, and as such, there is NO WARRANTY, SLA or SUPPORT for this code. 
-# This code is meant to be a starting point for your team to help you get to value with Pendo Data Sync more quickly. 
-# Please do not reach out to Pendo Support for help with these code, as Data Sync ETL is outside of the remit of their team and responsibilities.
+# This library of custom code snippets has been created by Pendo Professional Services, with the intent of enhancing the capabilities of Pendo products. Any and all snippets in this library are free and provided at no additional cost, and as such, are provided AS IS. For the avoidance of doubt, the library does not include any indemnification, support, or warranties of any kind, whether express or implied. For the avoidance of doubt, these snippets are outside of the remit of the Pendo Support team so please do not reach out to them for assistance with the library of code. Please do not reach out to Pendo Support for help with these snippets, as custom code is outside of the remit of their team and responsibilities.
+
 
 import sys
 import json
@@ -28,14 +27,13 @@ ROOT_URL = None # Root url for export to build full path to all files loaded bel
 # Global config
 MAX_NUM_TRIES = 3 # Maximum number of tries to load file before exiting program
 VALIDATE_LOAD = True # If true validates load by retrieving table and printing current table size
-MAX_THREADS = 4 # Max number of threads to spread load jobs between in async mode
 
 print(f"Loading Pendo data from {GCP_BUCKET}{GCP_PATH_TO_EXPORT} to project {GCP_PROJECT}, dataset {GCP_DATASET}")
 
 # Read specified JSON file from cloud storage
 def read_json(blob_name):
     blob = BUCKET.blob(blob_name)
-    with blob.open("r") as f:
+    with blob.open('r') as f:
         return json.loads(blob.download_as_string(client=None))
 
 # Load definition table based on supplied configuration
@@ -73,7 +71,7 @@ def load_definitions_table(uri, table_id, write_disposition):
     return
 
 # Load event table based on supplied configuration
-def load_event_table(uri, table_id, period_id):
+def load_events_table(uri, table_id, period_id, file_index):
     job_config = bigquery.LoadJobConfig(
         source_format=bigquery.SourceFormat.AVRO, # Specify Avro file format 
         write_disposition=bigquery.WriteDisposition.WRITE_APPEND, # Always append events
@@ -90,9 +88,10 @@ def load_event_table(uri, table_id, period_id):
                 BIGQUERY_CLIENT.get_table(table_id)
                 print(f"\t\t\tTable {table_id} already exists. (attempt {num_tries})")
 
-                # Drop rows from table with period if present 
-                print(f"\t\t\tDropping rows from {table_id} where periodId = {period_id} from table.")
-                BIGQUERY_CLIENT.query(f"DELETE FROM `{table_id}` WHERE periodId = PARSE_DATE('%Y%m%d',  '{period_id}');")
+                # If first file for matchable, drop rows from table with period
+                if (file_index == 0):
+                    print(f"\t\t\tDropping rows from {table_id} where periodId = {period_id} from table.")
+                    BIGQUERY_CLIENT.query(f"DELETE FROM `{table_id}` WHERE periodId = PARSE_DATE('%Y%m%d',  '{period_id}');")
 
                 # Send load job
                 print(f"\t\t\tAppending new rows to table {table_id}")
@@ -149,14 +148,14 @@ def setup():
 
     # 1 - Verify counter file is present, if not create
     try: 
-        COUNTER = read_json(f"{GCP_PATH_TO_EXPORT}/counter.json")["count"]
+        COUNTER = read_json(f"{GCP_PATH_TO_EXPORT}/counter.json")['count']
     except Exception as e:
         print(f"No counter file found: {str(e)} \nCreating counter file and initializing to 1")
 
         try:
             blob = BUCKET.blob(f"{GCP_PATH_TO_EXPORT}/counter.json")
             blob.upload_from_string(
-                data=json.dumps({"count": 1}),
+                data=json.dumps({'count': 1}),
                 content_type='application/json'
             )
             COUNTER = 1
@@ -180,8 +179,8 @@ def setup():
     # 3 - Load manifest and store as global for parsing in load functions
     try:
         MANIFEST = read_json(f"{GCP_PATH_TO_EXPORT}/exportmanifest.json")
-        EXPORT = next((export for export in MANIFEST["exports"] if export["counter"] == COUNTER), None)
-        ROOT_URL = EXPORT["rootUrl"]
+        EXPORT = next((export for export in MANIFEST['exports'] if export['counter'] == COUNTER), None)
+        ROOT_URL = EXPORT['rootUrl']
         print(f"Current root url: {ROOT_URL}")
     except Exception as e:
         print(f"Failed next export from manifest {GCP_PATH_TO_EXPORT}/exportmanifest.json. Exiting with exception: {str(e)}")
@@ -191,47 +190,52 @@ def setup():
 
 # Load each array of defintion avro files
 def load_definitions():    
-    definition_types = ["pageDefinitionsFile", "featureDefinitionsFile", "trackTypeDefinitionsFile", "guideDefinitionsFile"] # Array of definition file types, each containing an array of avro files to be loaded
-    definition_table_names = ["allpages", "allfeatures", "alltracktypes", "allguides"] # Array of table names corresponding to definition files
+    definition_types = ['pageDefinitionsFile', 'featureDefinitionsFile', 'trackTypeDefinitionsFile', 'guideDefinitionsFile'] # Array of definition file types, each containing an array of avro files to be loaded
+    definition_table_names = ['allpages', 'allfeatures', 'alltracktypes', 'allguides'] # Array of table names corresponding to definition files
 
-    # For each type of definition file, load all avro files defined in array
+    # For each type of definition file, if present, load all avro files defined in array
     for i,definition_type in enumerate(definition_types):
-        print(f"\tLoading definitions in: {definition_type}")
 
-        for j,definition_file in enumerate(EXPORT[definition_type]):
-            print(f"\t\tLoading definition: {definition_file}")
+        if (definition_type in EXPORT):
+            print(f"\tLoading definitions in: {definition_type}")
+            for j,definition_file in enumerate(EXPORT[definition_type]):
+                print(f"\t\tLoading definition: {definition_file}")
 
-            load_definitions_table(
-                f"{ROOT_URL}/{definition_file}", # Source file URI
-                f"{GCP_PROJECT}.{GCP_DATASET}.{definition_table_names[i]}", # Destination table name
-                bigquery.WriteDisposition.WRITE_TRUNCATE if j == 0 else bigquery.WriteDisposition.WRITE_APPEND # Truncate for first file in array, otherwise append
-            )
+                load_definitions_table(
+                    f"{ROOT_URL}/{definition_file}", # Source file URI
+                    f"{GCP_PROJECT}.{GCP_DATASET}.{definition_table_names[i]}", # Destination table name
+                    bigquery.WriteDisposition.WRITE_TRUNCATE if j == 0 else bigquery.WriteDisposition.WRITE_APPEND # Truncate for first file in array, otherwise append
+                )
 
 # Load each array of event files (allEvents + matchedEvents)
 def load_events():
-    for time_period in EXPORT["timeDependent"]:
-        period_id = time_period['periodId'].split("T")[0].replace("-", "") # Format period id in same format as BQ partition
+    for time_period in EXPORT['timeDependent']:
+        period_id = time_period['periodId'].split('T')[0].replace('-', '') # Format period id in same format as BQ partition
         print(f"\tLoading event files for period {period_id}")
 
-        # Load all events file
-        for all_events_file in time_period["allEvents"]["files"]:
-            print(f"\t\tLoading all events file: {all_events_file}")
-            load_event_table(
-                f"{ROOT_URL}/{all_events_file}", # Source file URI
-                f"{GCP_PROJECT}.{GCP_DATASET}.allevents", # Destination table name,
-                period_id # Period id of partition to load data to
-            )
-        
-        # Load matched events files
-        for i,matched_event in enumerate(time_period["matchedEvents"]):
-            print(f"\t\tLoading event files for matched event {matched_event['id']}")
-            for matched_event_file in matched_event["files"]:
-                print(f"\t\tLoading matched event file: {matched_event_file}")
-                load_event_table(
-                    f"{ROOT_URL}/{matched_event_file}", # Source file URI
-                    f"{GCP_PROJECT}.{GCP_DATASET}.{matched_event['id'].split('/')[1]}", # Destination table name,
-                    period_id # Period id of partition to load data to
+        # Load all events file, if present
+        if ('allEvents' in time_period):
+            for i,all_events_file in enumerate(time_period['allEvents']['files']):
+                print(f"\t\tLoading all events file: {all_events_file}")
+                load_events_table(
+                    f"{ROOT_URL}/{all_events_file}", # Source file URI
+                    f"{GCP_PROJECT}.{GCP_DATASET}.allevents", # Destination table name,
+                    period_id, # Period id of partition to load data to
+                    i # Index of file, to determine whether data should be dropped
                 )
+        
+        # Load matched events files, if present
+        if ('matchedEvents' in time_period):
+            for i,matched_event in enumerate(time_period['matchedEvents']):
+                print(f"\t\tLoading event files for matched event {matched_event['id']}")
+                for j,matched_event_file in enumerate(matched_event['files']):
+                    print(f"\t\tLoading matched event file: {matched_event_file}")
+                    load_events_table(
+                        f"{ROOT_URL}/{matched_event_file}", # Source file URI
+                        f"{GCP_PROJECT}.{GCP_DATASET}.{matched_event['id'].split('/')[1]}", # Destination table name,
+                        period_id, # Period id of partition to load data to
+                        j # Index of file, to determine whether data should be dropped
+                    ) 
 
 # After loading is completed perform any necessary cleanup
 # 1. Iterate and save counter file
@@ -243,7 +247,7 @@ def cleanup():
         print(f"\tUpdating counter.json. New value for counter: {COUNTER + 1}")
         blob = BUCKET.blob(f"{GCP_PATH_TO_EXPORT}/counter.json")
         blob.upload_from_string(
-            data=json.dumps({"count": COUNTER + 1}),
+            data=json.dumps({'count': COUNTER + 1}),
             content_type='application/json'
         )
     except Exception as e: 
