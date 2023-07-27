@@ -43,13 +43,13 @@ pip install -r requirements.txt
 Once your development environment is configured, you have successfully setup a Data Sync export, and the project is configured you can test the GCS to BQ loading code in this repository. There are two versions of this code for illustrative purposes. The first performs all GCP load and query commands synchronously as the export manifest is iterated over. This mode is not intended for production, but provides a clear picture of the logic flow of the program with properly ordered logs:
 
 ```
-python load_async.py <GCP_SOURCE_BUCKET_NAME> <GCP_SOURCE_PATH_TO_APPLICATION> <GCP_DESTINATION_PROJECT_NAME> <GCP_DESTINATION_DATASET_NAME>
+python load_sync.py <GCP_SOURCE_BUCKET_NAME> <GCP_SOURCE_PATH_TO_APPLICATION> <GCP_DESTINATION_PROJECT_NAME> <GCP_DESTINATION_DATASET_NAME>
 ```
 
 The second version performs all GCP load and query commands asynchronously in separate thread queues. This allows multiple jobs to be running in parallel for better performance. We recommend instrumenting a similar approach for your production ETL process:
 
 ```
-python load_sync.py <GCP_SOURCE_BUCKET_NAME> <GCP_SOURCE_PATH_TO_APPLICATION> <GCP_DESTINATION_PROJECT_NAME> <GCP_DESTINATION_DATASET_NAME>
+python load_async.py <GCP_SOURCE_BUCKET_NAME> <GCP_SOURCE_PATH_TO_APPLICATION> <GCP_DESTINATION_PROJECT_NAME> <GCP_DESTINATION_DATASET_NAME>
 ```
 
 Additionally, there is a script to manually create/update a counter.json file used to track the current export to load:
