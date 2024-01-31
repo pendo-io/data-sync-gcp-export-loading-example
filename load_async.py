@@ -279,7 +279,7 @@ def setup():
                 data=json.dumps({'count': 1}),
                 content_type='application/json'
             )
-            COUNTER = 1
+            COUNTER = 0
         except Exception as e: 
             print(f"Failed creating counter.json. Exiting with exception: {str(e)}")
             sys.exit()
