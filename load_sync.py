@@ -155,10 +155,10 @@ def setup():
         try:
             blob = BUCKET.blob(f"{GCP_PATH_TO_EXPORT}/counter.json")
             blob.upload_from_string(
-                data=json.dumps({'count': 1}),
+                data=json.dumps({'count': 0}),
                 content_type='application/json'
             )
-            COUNTER = 1
+            COUNTER = 0
         except Exception as e: 
             print(f"Failed creating counter.json. Exiting with exception: {str(e)}")
             sys.exit()
