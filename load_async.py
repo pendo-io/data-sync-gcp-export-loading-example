@@ -276,7 +276,7 @@ def setup():
         try:
             blob = BUCKET.blob(f"{GCP_PATH}/counter.json")
             blob.upload_from_string(
-                data=json.dumps({'count': 1}),
+                data=json.dumps({'count': 0}),
                 content_type='application/json'
             )
             COUNTER = 0
